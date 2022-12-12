@@ -4,6 +4,7 @@ import sys
 from enum import Enum
 
 import click
+import numpy
 import numpy as np
 import pygame
 
@@ -28,6 +29,7 @@ class Controls:
         self.previous_pos = (self.pos_x + 1 * self.offset, self.pos_y)
         self.next_pos = (self.pos_x + 2 * self.offset, self.pos_y)
         self.refresh_pos = (self.pos_x + 3 * self.offset, self.pos_y)
+        self.trash_pos = (window_width - size[0] - 5, self.pos_y)
 
         def init_button(path, pos, _size):
             return pygame.Rect(pos[0], pos[1], _size[0], _size[1]), pygame.transform.scale(pygame.image.load(path), _size)
@@ -37,17 +39,20 @@ class Controls:
         self.next_rect, self.next_icon = init_button(os.path.join("angle-right.png"), self.next_pos, size)
         self.previous_rect, self.previous_icon = init_button(os.path.join("angle-left.png"), self.previous_pos, size)
         self.refresh_rect, self.refresh_icon = init_button(os.path.join("refresh.png"), self.refresh_pos, size)
+        self.trash_rect, self.trash_icon = init_button(os.path.join("trash.png"), self.trash_pos, size)
 
     def draw(self, game_running):
         pygame.draw.rect(self.surface, (255, 255, 255), self.play_pause_rect)
         pygame.draw.rect(self.surface, (255, 255, 255), self.next_rect)
         pygame.draw.rect(self.surface, (255, 255, 255), self.previous_rect)
         pygame.draw.rect(self.surface, (255, 255, 255), self.refresh_rect)
+        pygame.draw.rect(self.surface, (255, 255, 255), self.trash_rect)
 
-        self.surface.blit(self.play_icon if game_running else self.pause_icon, self.play_pause_pos)
+        self.surface.blit(self.pause_icon if game_running else self.play_icon, self.play_pause_pos)
         self.surface.blit(self.next_icon, self.next_pos)
         self.surface.blit(self.previous_icon, self.previous_pos)
         self.surface.blit(self.refresh_icon, self.refresh_pos)
+        self.surface.blit(self.trash_icon, self.trash_pos)
 
     def next_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.next_rect.collidepoint(event.pos)
@@ -60,6 +65,9 @@ class Controls:
 
     def previous_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.previous_rect.collidepoint(event.pos)
+
+    def trash_clicked(self, event):
+        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.trash_rect.collidepoint(event.pos)
 
 
 @click.command()
@@ -77,23 +85,22 @@ def conway(cell_size, col, row):
 
     matrix = generate_start(cell_size, col, row, surface)
     matrix_history = collections.deque(maxlen=100)
-
     controls.draw(False)
     pygame.display.update()
 
     run_game = False
     previous_state = False
-    next_state = False
+    next_state_hold = False
     while True:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEMOTION:
                 continue
             elif controls.next_clicked(event):
                 run_game = True
-                next_state = True
-            elif next_state and event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                next_state_hold = True
+            elif next_state_hold and event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 run_game = False
-                next_state = False
+                next_state_hold = False
             elif controls.refresh_clicked(event):
                 matrix = generate_start(cell_size, col, row, surface)
                 run_game = False
@@ -104,19 +111,32 @@ def conway(cell_size, col, row):
                 previous_state = True
             elif previous_state and event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 previous_state = False
+            elif controls.trash_clicked(event):
+                matrix = np.zeros((col, row))
+                matrix_history = collections.deque()
+                draw_matrix(matrix, cell_size, surface)
+            elif event.type == pygame.MOUSEBUTTONDOWN and 0 < event.pos[1] < cell_size * row and 0 < event.pos[0] < cell_size * col:
+                x, y = event.pos
+                x = int((x - 1) / cell_size)
+                y = int((y - 1) / cell_size)
+                matrix[x, y] = 1 - matrix[x, y]
+                draw_matrix(matrix, cell_size, surface)
             elif event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
         if run_game:
-            matrix_history.append(matrix)
+            if not matrix_history:
+                matrix_history.append(matrix)
+            elif not np.array_equal(matrix, matrix_history[-1]):
+                matrix_history.append(matrix)
             matrix = next_generation(cell_size, col, matrix, row, surface)
         elif previous_state and matrix_history:
             matrix = matrix_history.pop()
             draw_matrix(matrix, cell_size, surface)
             pygame.time.delay(100)
 
-        controls.draw(run_game and not next_state)
+        controls.draw(run_game and not next_state_hold)
         pygame.display.update()
 
 
