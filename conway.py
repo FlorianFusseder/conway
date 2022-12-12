@@ -21,48 +21,42 @@ class Controls:
         self.surface = surface
         self.offset = size[0] + 5
 
-        self.pos_x = window_width / 2 - self.offset * 2.5
+        self.pos_x = window_width / 2 - self.offset * 2
         self.pos_y = window_height
 
-        self.play_pos = (self.pos_x, self.pos_y)
-        self.pause_pos = (self.pos_x + self.offset, self.pos_y)
-        self.previous_pos = (self.pos_x + 2 * self.offset, self.pos_y)
-        self.next_pos = (self.pos_x + 3 * self.offset, self.pos_y)
-        self.refresh_pos = (self.pos_x + 4 * self.offset, self.pos_y)
+        self.play_pause_pos = (self.pos_x, self.pos_y)
+        self.previous_pos = (self.pos_x + 1 * self.offset, self.pos_y)
+        self.next_pos = (self.pos_x + 2 * self.offset, self.pos_y)
+        self.refresh_pos = (self.pos_x + 3 * self.offset, self.pos_y)
 
         def init_button(path, pos, _size):
             return pygame.Rect(pos[0], pos[1], _size[0], _size[1]), pygame.transform.scale(pygame.image.load(path), _size)
 
-        self.play_rect, self.play_icon = init_button(os.path.join("play.png"), self.play_pos, size)
-        self.pause_rect, self.pause_icon = init_button(os.path.join("pause.png"), self.pause_pos, size)
+        self.play_pause_rect, self.play_icon = init_button(os.path.join("play.png"), self.play_pause_pos, size)
+        _, self.pause_icon = init_button(os.path.join("pause.png"), self.play_pause_pos, size)
         self.next_rect, self.next_icon = init_button(os.path.join("angle-right.png"), self.next_pos, size)
         self.previous_rect, self.previous_icon = init_button(os.path.join("angle-left.png"), self.previous_pos, size)
         self.refresh_rect, self.refresh_icon = init_button(os.path.join("refresh.png"), self.refresh_pos, size)
 
-    def draw(self):
+    def draw(self, game_running):
+        pygame.draw.rect(self.surface, (255, 255, 255), self.play_pause_rect)
         pygame.draw.rect(self.surface, (255, 255, 255), self.next_rect)
         pygame.draw.rect(self.surface, (255, 255, 255), self.previous_rect)
-        pygame.draw.rect(self.surface, (255, 255, 255), self.play_rect)
-        pygame.draw.rect(self.surface, (255, 255, 255), self.pause_rect)
         pygame.draw.rect(self.surface, (255, 255, 255), self.refresh_rect)
 
-        self.surface.blit(self.play_icon, self.play_pos)
+        self.surface.blit(self.play_icon if game_running else self.pause_icon, self.play_pause_pos)
         self.surface.blit(self.next_icon, self.next_pos)
         self.surface.blit(self.previous_icon, self.previous_pos)
-        self.surface.blit(self.pause_icon, self.pause_pos)
         self.surface.blit(self.refresh_icon, self.refresh_pos)
 
     def next_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.next_rect.collidepoint(event.pos)
 
-    def pause_clicked(self, event):
-        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.pause_rect.collidepoint(event.pos)
-
     def refresh_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.refresh_rect.collidepoint(event.pos)
 
-    def play_clicked(self, event):
-        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.play_rect.collidepoint(event.pos)
+    def play_pause_clicked(self, event):
+        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.play_pause_rect.collidepoint(event.pos)
 
     def previous_clicked(self, event):
         return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.previous_rect.collidepoint(event.pos)
@@ -84,7 +78,7 @@ def conway(cell_size, col, row):
     matrix = generate_start(cell_size, col, row, surface)
     matrix_history = collections.deque(maxlen=100)
 
-    controls.draw()
+    controls.draw(False)
     pygame.display.update()
 
     run_game = False
@@ -103,10 +97,8 @@ def conway(cell_size, col, row):
             elif controls.refresh_clicked(event):
                 matrix = generate_start(cell_size, col, row, surface)
                 run_game = False
-            elif controls.pause_clicked(event):
-                run_game = False
-            elif controls.play_clicked(event):
-                run_game = True
+            elif controls.play_pause_clicked(event):
+                run_game = not run_game
             elif controls.previous_clicked(event):
                 run_game = False
                 previous_state = True
@@ -124,7 +116,7 @@ def conway(cell_size, col, row):
             draw_matrix(matrix, cell_size, surface)
             pygame.time.delay(100)
 
-        controls.draw()
+        controls.draw(run_game and not next_state)
         pygame.display.update()
 
 
