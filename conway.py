@@ -82,7 +82,9 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
     pygame.init()
     pygame.display.set_caption("John Conway's Game of Life")
 
+    pool = None
     if all_cores:
+        print(f"Using {cpu_count()} cores, with {processes_per_core} process per core")
         processes = cpu_count() * processes_per_core
         print(f"original dimensions: {row}/{col}")
         col = int(col / processes) * processes
@@ -137,7 +139,8 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
                 matrix[x, y] = 1 - matrix[x, y]
                 draw_matrix(matrix, cell_size, surface)
             elif event.type == pygame.QUIT:
-                pool.close()
+                if pool:
+                    pool.close()
                 pygame.quit()
                 sys.exit()
 
