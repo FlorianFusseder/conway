@@ -1,10 +1,11 @@
 import collections
 import os
 import sys
+import timeit
 from enum import Enum
+from multiprocessing import cpu_count, Pool
 
 import click
-import numpy
 import numpy as np
 import pygame
 
@@ -74,9 +75,22 @@ class Controls:
 @click.option("--cell-size", default=10)
 @click.option("--col", default=100)
 @click.option("--row", default=100)
-def conway(cell_size, col, row):
+@click.option("--all-cores", is_flag=True, default=False, help="Uses all cores for calculation. If this flag is passed, the --col option will be rounded down, "
+                                                               "to a multiple of you cpu core count to give each process the same chunk size")
+@click.option("--processes-per-core", default=1)
+def conway(cell_size, col, row, all_cores, processes_per_core):
     pygame.init()
     pygame.display.set_caption("John Conway's Game of Life")
+
+    if all_cores:
+        processes = cpu_count() * processes_per_core
+        print(f"original dimensions: {row}/{col}")
+        col = int(col / processes) * processes
+        print(f"adjusted dimensions: {row}/{col}")
+        pool = Pool(processes)
+
+    print(f"{row} * {col} = {row * col} pixels")
+
     width = col * cell_size + 1
     height = row * cell_size + 1
 
@@ -91,6 +105,7 @@ def conway(cell_size, col, row):
     run_game = False
     previous_state = False
     next_state_hold = False
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEMOTION:
@@ -122,6 +137,7 @@ def conway(cell_size, col, row):
                 matrix[x, y] = 1 - matrix[x, y]
                 draw_matrix(matrix, cell_size, surface)
             elif event.type == pygame.QUIT:
+                pool.close()
                 pygame.quit()
                 sys.exit()
 
@@ -130,7 +146,18 @@ def conway(cell_size, col, row):
                 matrix_history.append(matrix)
             elif not np.array_equal(matrix, matrix_history[-1]):
                 matrix_history.append(matrix)
-            matrix = next_generation(cell_size, col, matrix, row, surface)
+
+            start = timeit.default_timer()
+            if all_cores:
+                args = [(matrix, _id, processes) for _id in range(processes)]
+                new_matrices = pool.starmap(next_generation, args)
+                matrix = np.concatenate(new_matrices)
+            else:
+                matrix = next_generation(matrix, 0, 1)
+            print(timeit.default_timer() - start)
+
+            draw_matrix(matrix, cell_size, surface)
+
         elif previous_state and matrix_history:
             matrix = matrix_history.pop()
             draw_matrix(matrix, cell_size, surface)
@@ -140,23 +167,23 @@ def conway(cell_size, col, row):
         pygame.display.update()
 
 
-def next_generation(cell_size, col, matrix, row, surface):
-    surface.fill(grid_color)
-    matrix_new = np.zeros((col, row), dtype=int)
-    for x, y in np.ndindex(matrix.shape):
+def next_generation(matrix, process_id, process_count):
+    matrix_part_length = int(matrix.shape[0] / process_count)
 
-        sum_x_lower = x - 1 if x > 0 else x
+    matrix_new = np.zeros((matrix_part_length, matrix.shape[1]), dtype=int)
+    for x, y in np.ndindex(matrix_part_length, matrix.shape[1]):
+        x_of_part = x + process_id * matrix_part_length
+
+        sum_x_lower = x_of_part - 1 if x_of_part > 0 else x_of_part
         sum_y_lower = y - 1 if y > 0 else y
 
-        alive_neighbours = np.sum(matrix[sum_x_lower:x + 2, sum_y_lower:y + 2]) - matrix[x, y]
+        alive_neighbours = np.sum(matrix[sum_x_lower:x_of_part + 2, sum_y_lower:y + 2]) - matrix[x_of_part, y]
 
-        if matrix[x, y] == 1 and alive_neighbours < 2 or alive_neighbours > 3:
+        if matrix[x_of_part, y] == 1 and alive_neighbours < 2 or alive_neighbours > 3:
             matrix_new[x, y] = 0
-        elif alive_neighbours == 3 or (
-                matrix[x, y] == 1 and (2 == alive_neighbours or alive_neighbours == 3)):
+        elif alive_neighbours == 3 or (matrix[x_of_part, y] == 1 and (2 == alive_neighbours or alive_neighbours == 3)):
             matrix_new[x, y] = 1
 
-        pygame.draw.rect(surface, State.alive.value if matrix_new[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
     return matrix_new
 
 
