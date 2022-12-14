@@ -99,6 +99,8 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
     surface = pygame.display.set_mode((width, height + 50))
     controls = Controls(surface, width, height, (50, 50))
 
+    surface.fill(grid_color)
+
     matrix = generate_start(cell_size, col, row, surface)
     matrix_history = collections.deque(maxlen=100)
     controls.draw(False)
@@ -157,7 +159,7 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
                 matrix = np.concatenate(new_matrices)
             else:
                 matrix = next_generation(matrix, 0, 1)
-            draw_matrix(matrix, cell_size, surface)
+            update_draw_matrix(matrix_history[-1], matrix, cell_size, surface)
             print(timeit.default_timer() - start)
         elif previous_state and matrix_history:
             matrix = matrix_history.pop()
@@ -195,9 +197,14 @@ def generate_start(cell_size, col, row, surface):
 
 
 def draw_matrix(matrix, cell_size, surface):
-    surface.fill(grid_color)
     for x, y in np.ndindex(matrix.shape):
         pygame.draw.rect(surface, State.alive.value if matrix[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
+
+
+def update_draw_matrix(matrix_old, matrix_new, cell_size, surface):
+    for x, y in np.ndindex(matrix_old.shape):
+        if matrix_new[x, y] != matrix_old[x, y]:
+            pygame.draw.rect(surface, State.alive.value if matrix_new[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
 
 
 if __name__ == "__main__":
