@@ -1,6 +1,7 @@
 import collections
 import os
 import sys
+import threading
 import timeit
 from enum import Enum
 from multiprocessing import cpu_count, Pool
@@ -117,6 +118,8 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
     previous_state = False
     next_state_hold = False
 
+    thread_ = None
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEMOTION:
@@ -151,6 +154,10 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
             elif event.type == pygame.QUIT:
                 if pool:
                     pool.close()
+
+                if thread_ and thread_.is_alive():
+                    thread_.join()
+
                 pygame.quit()
                 sys.exit()
 
@@ -167,7 +174,13 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
                 matrix = np.concatenate(new_matrices)
             else:
                 matrix = next_generation(matrix, 0, 1)
-            update_draw_matrix(matrix_history[-1], matrix, rects, surface)
+
+            if thread_:
+                thread_.join()
+
+            thread_ = threading.Thread(target=update_draw_matrix, args=(matrix_history[-1], matrix, rects, surface))
+            thread_.start()
+
             print(timeit.default_timer() - start)
         elif previous_state and matrix_history:
             matrix = matrix_history.pop()
@@ -180,11 +193,11 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
 
 def next_generation(matrix, process_id, process_count):
     matrix_part_length = int(matrix.shape[0] / process_count)
-
     matrix_new = np.zeros((matrix_part_length, matrix.shape[1]), dtype=int)
-    for x, y in np.ndindex(matrix_part_length, matrix.shape[1]):
-        x_of_part = x + process_id * matrix_part_length
+    offset = process_id * matrix_part_length
 
+    for x, y in np.ndindex(matrix_part_length, matrix.shape[1]):
+        x_of_part = x + offset
         sum_x_lower = x_of_part - 1 if x_of_part > 0 else x_of_part
         sum_y_lower = y - 1 if y > 0 else y
 
