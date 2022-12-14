@@ -101,7 +101,14 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
 
     surface.fill(grid_color)
 
-    matrix = generate_start(cell_size, col, row, surface)
+    matrix = np.random.randint(0, 2, size=(col, row))
+    rects = np.empty(matrix.shape, dtype=pygame.Rect)
+
+    for x, y in np.ndindex(rects.shape):
+        rects[x, y] = pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1)
+
+    draw_matrix(matrix, rects, surface)
+
     matrix_history = collections.deque(maxlen=100)
     controls.draw(False)
     pygame.display.update()
@@ -121,7 +128,8 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
                 run_game = False
                 next_state_hold = False
             elif controls.refresh_clicked(event):
-                matrix = generate_start(cell_size, col, row, surface)
+                matrix = np.random.randint(0, 2, size=(col, row))
+                draw_matrix(matrix, rects, surface)
                 run_game = False
             elif controls.play_pause_clicked(event):
                 run_game = not run_game
@@ -133,13 +141,13 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
             elif controls.trash_clicked(event):
                 matrix = np.zeros((col, row))
                 matrix_history = collections.deque()
-                draw_matrix(matrix, cell_size, surface)
+                draw_matrix(matrix, rects, surface)
             elif event.type == pygame.MOUSEBUTTONDOWN and 0 < event.pos[1] < cell_size * row and 0 < event.pos[0] < cell_size * col:
                 x, y = event.pos
                 x = int((x - 1) / cell_size)
                 y = int((y - 1) / cell_size)
                 matrix[x, y] = 1 - matrix[x, y]
-                draw_matrix(matrix, cell_size, surface)
+                draw_matrix(matrix, rects, surface)
             elif event.type == pygame.QUIT:
                 if pool:
                     pool.close()
@@ -159,11 +167,11 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
                 matrix = np.concatenate(new_matrices)
             else:
                 matrix = next_generation(matrix, 0, 1)
-            update_draw_matrix(matrix_history[-1], matrix, cell_size, surface)
+            update_draw_matrix(matrix_history[-1], matrix, rects, surface)
             print(timeit.default_timer() - start)
         elif previous_state and matrix_history:
             matrix = matrix_history.pop()
-            draw_matrix(matrix, cell_size, surface)
+            draw_matrix(matrix, rects, surface)
             pygame.time.delay(100)
 
         controls.draw(run_game and not next_state_hold)
@@ -190,21 +198,15 @@ def next_generation(matrix, process_id, process_count):
     return matrix_new
 
 
-def generate_start(cell_size, col, row, surface):
-    matrix = np.random.randint(0, 2, size=(col, row))
-    draw_matrix(matrix, cell_size, surface)
-    return matrix
-
-
-def draw_matrix(matrix, cell_size, surface):
+def draw_matrix(matrix, rects, surface):
     for x, y in np.ndindex(matrix.shape):
-        pygame.draw.rect(surface, State.alive.value if matrix[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
+        pygame.draw.rect(surface, State.alive.value if matrix[x, y] else State.dead.value, rects[x, y])
 
 
-def update_draw_matrix(matrix_old, matrix_new, cell_size, surface):
+def update_draw_matrix(matrix_old, matrix_new, rects, surface):
     for x, y in np.ndindex(matrix_old.shape):
         if matrix_new[x, y] != matrix_old[x, y]:
-            pygame.draw.rect(surface, State.alive.value if matrix_new[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
+            pygame.draw.rect(surface, State.alive.value if matrix_new[x, y] else State.dead.value, rects[x, y])
 
 
 if __name__ == "__main__":
