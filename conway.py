@@ -155,13 +155,10 @@ def conway(cell_size, col, row, all_cores, processes_per_core):
                 args = [(matrix, _id, processes) for _id in range(processes)]
                 new_matrices = pool.starmap(next_generation, args)
                 matrix = np.concatenate(new_matrices)
-                draw_matrix(matrix, cell_size, surface)
             else:
                 matrix = next_generation(matrix, 0, 1)
-                draw_matrix(matrix, cell_size, surface)
+            draw_matrix(matrix, cell_size, surface)
             print(timeit.default_timer() - start)
-
-
         elif previous_state and matrix_history:
             matrix = matrix_history.pop()
             draw_matrix(matrix, cell_size, surface)
@@ -198,12 +195,6 @@ def generate_start(cell_size, col, row, surface):
 
 
 def draw_matrix(matrix, cell_size, surface):
-    surface.fill(grid_color)
-    for x, y in np.ndindex(matrix.shape):
-        pygame.draw.rect(surface, State.alive.value if matrix[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
-
-
-def draw_matrix_chunk(matrix, cell_size, surface, process_id, process_count):
     surface.fill(grid_color)
     for x, y in np.ndindex(matrix.shape):
         pygame.draw.rect(surface, State.alive.value if matrix[x, y] else State.dead.value, pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 1, cell_size - 1))
